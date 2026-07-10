@@ -1,5 +1,5 @@
 const fs = require("fs/promises");
-const cheerio = require("cheerio");
+const { chromium } = require("playwright");
 
 const BASE_URL = "https://www.wikiloc.com/trails/hiking/bangladesh/chittagong";
 const START_PAGE = 1;
@@ -12,111 +12,115 @@ function buildPageUrl(page) {
   return `${BASE_URL}?page=${page}`;
 }
 
-async function fetchHtml(url, retries = 3) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-        
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-          Accept: "text/html",
-        },
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-
-      return await res.text();
-    } catch (error) {
-      console.log(`Attempt ${attempt} failed for ${url}: ${error.message}`);
-
-      if (attempt === retries) {
-        throw error;
-      }
-
-      await sleep(2000);
-    }
-  }
-}
-
-function extractTrails(html, page) {
-  const $ = cheerio.load(html);
-  const trails = [];
-
-  $(".trail-card-with-description").each((_, element) => {
-    const card = $(element);
-
-    const name = card
-      .find(".trail-card-with-description__title a")
-      .text()
-      .trim()
-      .replace(/\s+/g, " ");
-
-    const relativeUrl = card
-      .find(".trail-card-with-description__title a")
-      .attr("href");
-
-    let distance = null;
-    let elevation = null;
-
-    card.find(".trail-card-with-description__detail__stats > div").each((_, stat) => {
-      const label = $(stat)
-        .find(".trail-card-with-description__detail__stats__name")
-        .text()
-        .trim();
-
-      const value = $(stat)
-        .find(".trail-card-with-description__detail__stats__value")
-        .text()
-        .trim();
-
-      if (label === "Distance") {
-        distance = value;
-      }
-
-      if (label.includes("Elevation")) {
-        elevation = value;
-      }
-    });
-
-    if (name) {
-      trails.push({
-        name,
-        distance,
-        elevation,
-        page,
-        url: relativeUrl ? `https://www.wikiloc.com${relativeUrl}` : null,
-      });
-    }
+async function main() {
+  const browser = await chromium.launch({
+    headless: false, // keep false first time so you can see what happens
   });
 
-  return trails;
-}
+  const page = await browser.newPage();
 
-async function main() {
   const allTrails = [];
 
-  for (let page = START_PAGE; page <= END_PAGE; page++) {
-    const url = buildPageUrl(page);
-    console.log(`Scraping page ${page}: ${url}`);
+  for (let pageNumber = START_PAGE; pageNumber <= END_PAGE; pageNumber++) {
+    const url = buildPageUrl(pageNumber);
+
+    console.log(`Scraping page ${pageNumber}: ${url}`);
 
     try {
-      const html = await fetchHtml(url);
-      const trails = extractTrails(html, page);
+      await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: 60000,
+      });
 
-      console.log(`Found ${trails.length} trails on page ${page}`);
+      await page.waitForTimeout(3000);
+
+      const blockedText = await page.locator("body").innerText();
+
+      if (
+        blockedText.includes("403") ||
+        blockedText.toLowerCase().includes("access denied") ||
+        blockedText.toLowerCase().includes("forbidden")
+      ) {
+        console.log(`Page ${pageNumber} appears blocked. Skipping.`);
+        continue;
+      }
+
+      await page.waitForSelector(".trail-card-with-description", {
+        timeout: 20000,
+      });
+
+      const trails = await page.$$eval(
+        ".trail-card-with-description",
+        (cards, pageNumber) => {
+          return cards
+            .map((card) => {
+              const titleEl = card.querySelector(
+                ".trail-card-with-description__title a"
+              );
+
+              const name = titleEl?.innerText?.trim().replace(/\s+/g, " ") || null;
+              const href = titleEl?.getAttribute("href") || null;
+
+              let distance = null;
+              let elevation = null;
+
+              const statRows = card.querySelectorAll(
+                ".trail-card-with-description__detail__stats > div"
+              );
+
+              statRows.forEach((row) => {
+                const label = row
+                  .querySelector(".trail-card-with-description__detail__stats__name")
+                  ?.innerText?.trim();
+
+                const value = row
+                  .querySelector(".trail-card-with-description__detail__stats__value")
+                  ?.innerText?.trim();
+
+                if (label === "Distance") {
+                  distance = value;
+                }
+
+                if (label && label.includes("Elevation")) {
+                  elevation = value;
+                }
+              });
+
+              if (!name) return null;
+
+              return {
+                name,
+                distance,
+                elevation,
+                page: pageNumber,
+                url: href ? `https://www.wikiloc.com${href}` : null,
+              };
+            })
+            .filter(Boolean);
+        },
+        pageNumber
+      );
+
+      console.log(`Found ${trails.length} trails on page ${pageNumber}`);
+
       allTrails.push(...trails);
 
-      // Be polite. Do not hit the website too fast.
-      await sleep(1500);
+      await fs.writeFile(
+        OUTPUT_FILE,
+        JSON.stringify(allTrails, null, 2),
+        "utf8"
+      );
+
+      await sleep(4000);
     } catch (error) {
-      console.error(`Failed to scrape page ${page}: ${error.message}`);
+      console.log(`Failed page ${pageNumber}: ${error.message}`);
+
+      const html = await page.content();
+      await fs.writeFile(`debug-page-${pageNumber}.html`, html, "utf8");
     }
   }
 
-  await fs.writeFile(OUTPUT_FILE, JSON.stringify(allTrails, null, 2), "utf8");
+  await browser.close();
 
   console.log(`Done. Saved ${allTrails.length} trails to ${OUTPUT_FILE}`);
 }
