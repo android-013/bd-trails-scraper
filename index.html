@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BD Trails Sorter</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f3f6f5;
+      color: #1f2937;
+    }
+
+    header {
+      background: linear-gradient(135deg, #064e3b, #0f766e);
+      color: white;
+      padding: 28px 18px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 32px;
+    }
+
+    header p {
+      margin: 8px 0 0;
+      opacity: 0.9;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .controls {
+      background: white;
+      padding: 16px;
+      border-radius: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+    }
+
+    .control-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    input,
+    select,
+    button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+    }
+
+    input {
+      min-width: 240px;
+    }
+
+    button {
+      border: none;
+      background: #0f766e;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #115e59;
+    }
+
+    .unit-btn {
+      background: #2563eb;
+    }
+
+    .unit-btn:hover {
+      background: #1d4ed8;
+    }
+
+    .status {
+      margin-bottom: 14px;
+      font-weight: bold;
+    }
+
+    .error {
+      color: #dc2626;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+    }
+
+    th {
+      background: #0f766e;
+      color: white;
+      padding: 14px;
+      text-align: left;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    th:hover {
+      background: #115e59;
+    }
+
+    td {
+      padding: 14px;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+
+    tr:hover {
+      background: #f9fafb;
+    }
+
+    .trail-name {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .trail-link {
+      color: #0f766e;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .trail-link:hover {
+      text-decoration: underline;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #ecfdf5;
+      color: #047857;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .sort-icon {
+      font-size: 12px;
+      margin-left: 4px;
+      opacity: 0.8;
+    }
+
+    @media (max-width: 768px) {
+      .controls,
+      .control-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      input,
+      select,
+      button {
+        width: 100%;
+      }
+
+      table,
+      thead,
+      tbody,
+      tr,
+      th,
+      td {
+        display: block;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tr {
+        margin-bottom: 14px;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+      }
+
+      td {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: none;
+      }
+
+      td::before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: #374151;
+      }
+
+      td:first-child {
+        display: block;
+      }
+
+      td:first-child::before {
+        display: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>BD Trails Sorter</h1>
+    <p>Sort trails by distance and elevation gain</p>
+  </header>
+
+  <div class="container">
+    <div class="controls">
+      <div class="control-group">
+        <input id="searchInput" type="text" placeholder="Search trail name..." />
+
+        <select id="sortBy">
+          <option value="distance">Sort by Distance</option>
+          <option value="elevation">Sort by Elevation Gain</option>
+        </select>
+
+        <select id="sortOrder">
+          <option value="asc">Ascending</option>
+          <option value="desc">Descending</option>
+        </select>
+
+        <button id="sortBtn">Sort</button>
+      </div>
+
+      <div class="control-group">
+        <button id="unitBtn" class="unit-btn">Switch to Metric</button>
+      </div>
+    </div>
+
+    <div id="status" class="status">Loading trails.json...</div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Trail Name</th>
+          <th id="distanceHeader">
+            Distance <span id="distanceIcon" class="sort-icon"></span>
+          </th>
+          <th id="elevationHeader">
+            Elevation Gain <span id="elevationIcon" class="sort-icon"></span>
+          </th>
+          <th>Page</th>
+        </tr>
+      </thead>
+
+      <tbody id="trailTableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let trails = [];
+    let currentUnit = "imperial";
+    let currentSortBy = "distance";
+    let currentSortOrder = "asc";
+
+    const tableBody = document.getElementById("trailTableBody");
+    const statusText = document.getElementById("status");
+    const searchInput = document.getElementById("searchInput");
+    const sortBySelect = document.getElementById("sortBy");
+    const sortOrderSelect = document.getElementById("sortOrder");
+    const sortBtn = document.getElementById("sortBtn");
+    const unitBtn = document.getElementById("unitBtn");
+
+    const distanceHeader = document.getElementById("distanceHeader");
+    const elevationHeader = document.getElementById("elevationHeader");
+
+    async function loadTrails() {
+      try {
+        const response = await fetch("./trails.json");
+
+        if (!response.ok) {
+          throw new Error("Could not load trails.json");
+        }
+
+        const data = await response.json();
+
+        trails = data.map((trail) => ({
+          ...trail,
+          distanceMiles: parseDistanceToMiles(trail.distance),
+          elevationFeet: parseElevationToFeet(trail.elevation),
+        }));
+
+        sortTrails();
+        renderTrails();
+      } catch (error) {
+        statusText.classList.add("error");
+        statusText.textContent =
+          "Failed to load trails.json. Run this using a local server, not by double-clicking index.html.";
+      }
+    }
+
+    function parseDistanceToMiles(value) {
+      if (!value) return 0;
+
+      const number = parseFloat(String(value).replace(/[^\d.]/g, ""));
+
+      if (String(value).toLowerCase().includes("km")) {
+        return number / 1.60934;
+      }
+
+      return number;
+    }
+
+    function parseElevationToFeet(value) {
+      if (!value) return 0;
+
+      const number = parseFloat(String(value).replace(/[^\d.]/g, ""));
+
+      if (String(value).toLowerCase().includes("m")) {
+        return number * 3.28084;
+      }
+
+      return number;
+    }
+
+    function milesToKm(miles) {
+      return miles * 1.60934;
+    }
+
+    function feetToMeters(feet) {
+      return feet * 0.3048;
+    }
+
+    function formatDistance(miles) {
+      if (currentUnit === "metric") {
+        return `${milesToKm(miles).toFixed(2)} km`;
+      }
+
+      return `${miles.toFixed(2)} mi`;
+    }
+
+    function formatElevation(feet) {
+      if (currentUnit === "metric") {
+        return `${Math.round(feetToMeters(feet))} m`;
+      }
+
+      return `${Math.round(feet)} ft`;
+    }
+
+    function sortTrails() {
+      trails.sort((a, b) => {
+        const valueA =
+          currentSortBy === "distance" ? a.distanceMiles : a.elevationFeet;
+
+        const valueB =
+          currentSortBy === "distance" ? b.distanceMiles : b.elevationFeet;
+
+        return currentSortOrder === "asc"
+          ? valueA - valueB
+          : valueB - valueA;
+      });
+    }
+
+    function getFilteredTrails() {
+      const searchTerm = searchInput.value.trim().toLowerCase();
+
+      if (!searchTerm) return trails;
+
+      return trails.filter((trail) =>
+        trail.name.toLowerCase().includes(searchTerm)
+      );
+    }
+
+    function renderTrails() {
+      const filteredTrails = getFilteredTrails();
+
+      tableBody.innerHTML = "";
+
+      filteredTrails.forEach((trail) => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td data-label="Trail Name">
+            <div class="trail-name">${escapeHtml(trail.name)}</div>
+            <a class="trail-link" href="${trail.url}" target="_blank">View trail</a>
+          </td>
+
+          <td data-label="Distance">
+            <span class="badge">${formatDistance(trail.distanceMiles)}</span>
+          </td>
+
+          <td data-label="Elevation Gain">
+            <span class="badge">${formatElevation(trail.elevationFeet)}</span>
+          </td>
+
+          <td data-label="Page">
+            ${trail.page ?? ""}
+          </td>
+        `;
+
+        tableBody.appendChild(row);
+      });
+
+      statusText.classList.remove("error");
+      statusText.textContent = `Showing ${filteredTrails.length} of ${trails.length} trails`;
+
+      updateSortIcons();
+    }
+
+    function updateSortIcons() {
+      document.getElementById("distanceIcon").textContent = "";
+      document.getElementById("elevationIcon").textContent = "";
+
+      const icon = currentSortOrder === "asc" ? "▲" : "▼";
+
+      if (currentSortBy === "distance") {
+        document.getElementById("distanceIcon").textContent = icon;
+      }
+
+      if (currentSortBy === "elevation") {
+        document.getElementById("elevationIcon").textContent = icon;
+      }
+    }
+
+    function applySort() {
+      currentSortBy = sortBySelect.value;
+      currentSortOrder = sortOrderSelect.value;
+
+      sortTrails();
+      renderTrails();
+    }
+
+    function sortFromHeader(type) {
+      if (currentSortBy === type) {
+        currentSortOrder = currentSortOrder === "asc" ? "desc" : "asc";
+      } else {
+        currentSortBy = type;
+        currentSortOrder = "asc";
+      }
+
+      sortBySelect.value = currentSortBy;
+      sortOrderSelect.value = currentSortOrder;
+
+      sortTrails();
+      renderTrails();
+    }
+
+    function toggleUnit() {
+      currentUnit = currentUnit === "imperial" ? "metric" : "imperial";
+
+      unitBtn.textContent =
+        currentUnit === "imperial"
+          ? "Switch to Metric"
+          : "Switch to Imperial";
+
+      renderTrails();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    sortBtn.addEventListener("click", applySort);
+    unitBtn.addEventListener("click", toggleUnit);
+    searchInput.addEventListener("input", renderTrails);
+
+    distanceHeader.addEventListener("click", () => sortFromHeader("distance"));
+    elevationHeader.addEventListener("click", () => sortFromHeader("elevation"));
+
+    loadTrails();
+  </script>
+</body>
+</html>
