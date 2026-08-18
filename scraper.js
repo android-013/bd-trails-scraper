@@ -1,9 +1,9 @@
 const fs = require("fs/promises");
 const { chromium } = require("playwright");
 
-const BASE_URL = "https://www.wikiloc.com/trails/hiking/bangladesh/chittagong";
+const BASE_URL = "https://www.wikiloc.com/trails/hiking/bangladesh";
 const START_PAGE = 1;
-const END_PAGE = 52;
+const END_PAGE = 70;
 const OUTPUT_FILE = "trails.json";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
